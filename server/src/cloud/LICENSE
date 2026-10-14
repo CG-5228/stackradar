@@ -1,7 +1,7 @@
 StackRadar Cloud Licence
 ========================
 
-Copyright (c) 2026 Lockdep AS. All rights reserved.
+Copyright (c) 2026 LockDep. All rights reserved.
 
 Everything in this directory (`server/src/cloud/`) is **source-available**
 under this licence and is **not** covered by the GNU Affero General Public
@@ -73,7 +73,7 @@ legal claim.
 
 ## Definitions
 
-The "licensor" is Lockdep AS, the entity offering these terms. The "software"
+The "licensor" is LockDep, the entity offering these terms. The "software"
 is the software the licensor makes available under these terms, including any
 portion of it. "You" refers to the individual or entity agreeing to these
 terms. "Use" means anything you do with the software requiring one of your

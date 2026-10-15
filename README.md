@@ -1,18 +1,22 @@
-# StackRadar
+<h1>
+  <img src=".github/logo-heading.svg" alt="" width="32" height="40" align="top"> StackRadar
+</h1>
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-informational?style=flat-square)](LICENSE)
+**See every known vulnerability on the images actually running in your
+Kubernetes cluster, ranked by what to fix first.** Self-hosted under
+AGPL-3.0, or hosted at [app.stackradar.io](https://app.stackradar.io).
+
 [![Latest release](https://img.shields.io/github/v/release/lockdep/stackradar?style=flat-square&label=Release)](https://github.com/lockdep/stackradar/releases/latest)
 [![Tests](https://img.shields.io/github/actions/workflow/status/lockdep/stackradar/ci-test.yaml?branch=main&style=flat-square&label=Tests)](https://github.com/lockdep/stackradar/actions/workflows/ci-test.yaml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/lockdep/stackradar/codeql.yaml?branch=main&style=flat-square&label=CodeQL)](https://github.com/lockdep/stackradar/actions/workflows/codeql.yaml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-informational?style=flat-square)](LICENSE)
+[![Signed with cosign](https://img.shields.io/badge/Signed-cosign%20keyless-informational?style=flat-square)](#verifying-what-you-install)
 [![Helm chart](https://img.shields.io/badge/Helm-lockdep%2Fhelm--charts-informational?style=flat-square)](https://github.com/lockdep/helm-charts)
 [![Discussions](https://img.shields.io/badge/Discussions-ask%20a%20question-informational?style=flat-square)](https://github.com/lockdep/stackradar/discussions)
 
-See every known vulnerability on the images actually running in your
-Kubernetes cluster, ranked by what to fix first. Self-hosted, or at
-[app.stackradar.io](https://app.stackradar.io).
-
-A scanner agent in the cluster generates a CycloneDX SBOM for every image
-that runs and reports which namespace, workload, Helm release and Argo CD
-application it runs in. The server keeps its own mirror of
+A read-only scanner agent in the cluster generates a CycloneDX SBOM for
+every image that runs and reports which namespace, workload, Helm release
+and Argo CD application it runs in. The server keeps its own mirror of
 [OSV.dev](https://osv.dev), [EPSS](https://www.first.org/epss/) and the
 [CISA KEV catalogue](https://www.cisa.gov/known-exploited-vulnerabilities-catalog),
 matches every SBOM against it, re-matches when the mirror changes, and
@@ -21,6 +25,22 @@ CVSS alone. The dashboard answers "which pods run a new CVE" the moment the
 advisory is published.
 
 ![The StackRadar dashboard: critical, high, medium and low counts with 30-day trends, and the running images that picked up new vulnerabilities](docs/images/dashboard.png)
+
+## Contents
+
+* [Features](#features)
+* [How it works](#how-it-works)
+* [Quickstart (Helm)](#quickstart-helm)
+* [Quickstart (Docker Compose)](#quickstart-docker-compose)
+* [Community Edition vs StackRadar Cloud](#community-edition-vs-stackradar-cloud)
+* [Distributions](#distributions)
+* [Verifying what you install](#verifying-what-you-install)
+* [Security](#security)
+* [Documentation](#documentation)
+* [Related repositories](#related-repositories)
+* [Contributing](#contributing)
+* [Community](#community)
+* [Copyright & Licence](#copyright--licence)
 
 ## Features
 
@@ -57,10 +77,52 @@ advisory is published.
   phone home; adoption is counted in pulls, issues and
   [ADOPTERS.md](ADOPTERS.md).
 
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph cluster["Your Kubernetes cluster"]
+        scanner["stackradar-scanner<br/>pod informer + Syft"]
+    end
+
+    subgraph platform["StackRadar (this repository)"]
+        client["client<br/>Next.js UI + BFF"]
+        server["server<br/>API + job worker + sync schedule"]
+        pg[("PostgreSQL")]
+    end
+
+    subgraph feeds["Public advisory feeds"]
+        osv["OSV.dev"]
+        epss["EPSS"]
+        kev["CISA KEV"]
+    end
+
+    browser["Browser"] --> client
+    client --> server
+    scanner -->|"SBOM + inventory, cluster-scoped API key"| server
+    server --> pg
+    client --> pg
+    osv & epss & kev -.->|"mirrored on a schedule"| server
+```
+
+Three components, two of them in this repository. The **scanner** watches
+the pods of the cluster it runs in, generates one SBOM per image digest
+and reports the full inventory (namespace, workload, container, Helm
+release, Argo CD application) over an API key scoped to that cluster. The
+**server** holds the SBOMs, mirrors the advisory feeds locally, matches
+components against them by package URL and re-matches when the mirror
+changes, and ranks every finding and every rollup. The **client** is the
+dashboard and the only thing a browser talks to; it owns sign-in and
+proxies the API. One PostgreSQL database carries both.
+
+The full picture, with the trust boundaries, the data model and the
+decisions behind them, is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+and the ADRs in [docs/adr/](docs/adr/).
+
 ## Quickstart (Helm)
 
-One command on any Kubernetes 1.25+ cluster. No values file, no database to
-bring, no second command for the scanner:
+One command on any Kubernetes 1.25+ cluster with Helm 3.8+. No values
+file, no database to bring, no second command for the scanner:
 
 ```sh
 helm install stackradar oci://ghcr.io/lockdep/helm-charts/stackradar \
@@ -141,38 +203,107 @@ Tags: `:<version>` is immutable, `:<major>.<minor>` follows the newest
 patch of that minor, `:latest` is the newest release, `:snapshot` is the
 last merge to `main` ([`dev/docker-compose.yml`](dev/docker-compose.yml)
 runs that one). Releases are built for `linux/amd64` and `linux/arm64`,
-signed with Cosign (keyless), and carry a CycloneDX SBOM of each image on
-the [GitHub Release](https://github.com/lockdep/stackradar/releases);
-[RELEASING.md](RELEASING.md) has the verification commands and the pin
+signed with Cosign (keyless), carry SLSA provenance and SBOM attestations
+in the image index, and attach a CycloneDX SBOM of each image to the
+[GitHub Release](https://github.com/lockdep/stackradar/releases).
+[RELEASING.md](RELEASING.md) is the release process and the pin
 recommendations. The scanner agent is a separate image and chart from
 [lockdep/stackradar-scanner](https://github.com/lockdep/stackradar-scanner).
 
-## Deploying on Kubernetes with Helm
+## Verifying what you install
 
-The chart lives in [lockdep/helm-charts](https://github.com/lockdep/helm-charts)
-(`charts/stackradar`); its README is the values reference and
-[docs/self-hosting/helm.md](docs/self-hosting/helm.md) is the walkthrough.
-The rest of [docs/self-hosting/](docs/self-hosting/) covers users and
-local login, OIDC, moving to your own Postgres, upgrading and backups.
+Every release is signed with [cosign](https://docs.sigstore.dev/) keyless
+signing. There is no public key to distribute: the signature is bound to
+this repository's release workflow by a Sigstore certificate recorded in
+the public Rekor transparency log.
+
+```sh
+VERSION=<version>
+IDENTITY="^https://github.com/lockdep/stackradar/.github/workflows/publish.yaml@refs/tags/v${VERSION}\$"
+ISSUER="https://token.actions.githubusercontent.com"
+
+cosign verify \
+  --certificate-identity-regexp "$IDENTITY" \
+  --certificate-oidc-issuer "$ISSUER" \
+  "ghcr.io/lockdep/stackradar-server:${VERSION}"
+
+cosign verify \
+  --certificate-identity-regexp "$IDENTITY" \
+  --certificate-oidc-issuer "$ISSUER" \
+  "ghcr.io/lockdep/stackradar-client:${VERSION}"
+```
+
+The chart pins both images by digest, so what you deploy is the exact
+artifact that release built, signed and attested, regardless of where the
+tag points later. The `:snapshot` images are signed too, by
+`snapshot.yaml` at `refs/heads/main`; substitute that identity to verify
+one.
+
+## Security
+
+* **The agent is read-only.** Its ClusterRole is `list` and `watch` on
+  pods plus metadata-only `get` on their controllers; no `create`,
+  `update`, `delete` or `patch` on anything. What leaves the cluster is an
+  allowlist, documented line by line in the
+  [scanner README](https://github.com/lockdep/stackradar-scanner#what-leaves-your-cluster).
+* **No telemetry.** Neither image phones home. The only outbound traffic
+  from a self-hosted install is the advisory mirror syncs.
+* **Scanner keys are cluster-scoped.** An SBOM, its findings and its
+  inventory belong to exactly one cluster; nothing derived from an upload
+  is ever shared across clusters
+  ([ADR 0006](docs/adr/0006-images-are-cluster-scoped.md)).
+* **Signed, attested, multi-arch releases**, verifiable with the commands
+  above. CodeQL and Dependabot run on every change.
+
+Report a vulnerability privately through
+[GitHub's private reporting](https://github.com/lockdep/stackradar/security/advisories/new)
+or to security@stackradar.io; [SECURITY.md](SECURITY.md) has the scope,
+the response time and the supported versions.
+
+## Documentation
+
+| | |
+|:--|:--|
+| [docs/self-hosting/](docs/self-hosting/) | The self-hosting manual: Helm walkthrough, Compose, users and local login, OIDC, your own Postgres, upgrading, backups |
+| [Chart values reference](https://github.com/lockdep/helm-charts/blob/main/charts/stackradar/README.md) | Every value of the `stackradar` chart, in `lockdep/helm-charts` |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The system, its trust boundaries, the data model and the data flow end to end |
+| [docs/adr/](docs/adr/) | Architecture decision records: why images are the unit of identity, why risk is two layers, why the aggregate is an unbounded sum |
+| [docs/contracts/](docs/contracts/) | The scanner wire format (`inventory-v3`) and the internal match endpoint |
+| [docs/authorization-matrix.md](docs/authorization-matrix.md) | Who can do what: roles, keys and the endpoints they reach |
+| [DEVELOPING.md](DEVELOPING.md) | Building, running and testing the two apps |
+| [RELEASING.md](RELEASING.md) | How a version ships, and how to pin one |
+| [stackradar.io/docs](https://stackradar.io/docs) | The hosted product's documentation |
+
+## Related repositories
+
+| Repository | What it is | Licence |
+|:--|:--|:--|
+| [lockdep/stackradar](https://github.com/lockdep/stackradar) | This one: the server, the web client, the Compose quickstart and the self-hosting docs | AGPL-3.0 |
+| [lockdep/helm-charts](https://github.com/lockdep/helm-charts) | The `stackradar` Helm chart: both apps, a bundled Postgres and the scanner in one install | Apache-2.0 |
+| [lockdep/stackradar-scanner](https://github.com/lockdep/stackradar-scanner) | The in-cluster agent and its own chart; the only SBOM ingestion path | Apache-2.0 |
+| [lockdep/stackradar-cli](https://github.com/lockdep/stackradar-cli) | `stackradar scan`: the same question answered from a laptop, with no account and no agent | Apache-2.0 |
 
 ## Contributing
 
-Interested in contributing to StackRadar? [CONTRIBUTING.md](CONTRIBUTING.md)
-says how to ask, file, and send code; [DEVELOPING.md](DEVELOPING.md) says how
-to build and run it.
+Contributions in every shape are welcome: a question that shows where the
+docs are unclear, a defect report with a reproduction, a documentation
+fix, a pull request. [CONTRIBUTING.md](CONTRIBUTING.md) says how to ask,
+file and send code (commits are signed off under the
+[Developer Certificate of Origin](https://developercertificate.org/); there
+is no CLA), [DEVELOPING.md](DEVELOPING.md) says how to build and run it,
+and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) is the Contributor Covenant.
 
-## Resources
-
-* Self-hosting: [docs/self-hosting/](docs/self-hosting/)
-* Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the ADRs in [docs/adr/](docs/adr/)
-* Who runs it: [ADOPTERS.md](ADOPTERS.md)
-* Website: <https://stackradar.io>
+Issues labelled [`good first issue`](https://github.com/lockdep/stackradar/issues?q=is%3Aopen+label%3A%22good+first+issue%22)
+and [`help wanted`](https://github.com/lockdep/stackradar/issues?q=is%3Aopen+label%3A%22help+wanted%22)
+are the ones to start with.
 
 ## Community
 
 * Questions and ideas: [GitHub Discussions](https://github.com/lockdep/stackradar/discussions)
 * Defects and enhancements: [GitHub Issues](https://github.com/lockdep/stackradar/issues)
 * Security reports: [SECURITY.md](SECURITY.md)
+* Who runs it: [ADOPTERS.md](ADOPTERS.md)
+* Website: <https://stackradar.io>
 
 ## Copyright & Licence
 
@@ -183,5 +314,6 @@ The code in this repository is licensed under the
 exception: the files under `server/src/cloud/` and `client/src/cloud/` are
 source-available under the [StackRadar Cloud Licence](server/src/cloud/LICENSE),
 which allows anything except offering them as a hosted or managed service.
-The scanner agent is Apache-2.0. The licence covers the code, not the name;
-see [NOTICE](NOTICE) for the trademark terms.
+The scanner agent, the CLI and the Helm chart are Apache-2.0. The licence
+covers the code, not the name; see [NOTICE](NOTICE) for the trademark
+terms.

@@ -307,12 +307,41 @@ the `helm` and `syft` binaries the server image carries.
 | `:<version>` (`:0.2.0`) | One release, forever | Production. Move it on purpose, after reading the notes of every version you skip past ([upgrading.md](docs/self-hosting/upgrading.md)). |
 | `:<major>.<minor>` (`:0.2`) | The newest patch of that minor | You want fixes without reading notes; a patch never carries a breaking change or, in practice, a migration you have to prepare for. |
 | `:latest` | The newest stable release | Evaluation only (the Compose quickstart's default). It crosses minors and, one day, majors. |
-| `:snapshot` | The last merge to `main` | Trying what is coming ([`dev/docker-compose.yml`](dev/docker-compose.yml)). Not signed by a release, not immutable, `linux/amd64` only. |
+| `:snapshot` | The last merge to `main` | Trying what is coming ([`dev/docker-compose.yml`](dev/docker-compose.yml)). Not signed by a release, not immutable, `linux/amd64` only. The digest a snapshot resolved to stays pullable for two weeks after the tag moves on, then [`prune-images.yaml`](.github/workflows/prune-images.yaml) collects it (below). |
 
 The chart's image helper refuses a semver tag from an app major it does
 not support and lets `snapshot`, `latest` and digests through as a
 deliberate choice. Pin by digest (`server.image.tag: sha256:…`) when the
 cluster must not re-resolve anything.
+
+### What happens to old snapshots
+
+Every merge moves `:snapshot` and leaves the previous index, its two
+children (the image and its provenance attestation) and its cosign
+signature behind as versions nothing references. Released versions never
+lose their tag, so they are never in that state.
+
+[`prune-images.yaml`](.github/workflows/prune-images.yaml) runs
+[`scripts/ghcr-prune.mjs`](scripts/ghcr-prune.mjs) every Sunday. "Untagged"
+is not "unreferenced": a release's per-platform manifests and attestations
+are untagged children of its tagged index, and its signature is an untagged
+manifest reachable only through a `sha256-<digest>` referrers tag, so a job
+that deleted untagged versions would break `docker pull` and
+`cosign verify` of every release. The script walks the graph instead. A
+version is kept when it carries a real tag, is younger than the window
+(14 days: a build in flight pushes its children before it tags the index,
+and the development deployment can roll back to the previous snapshot
+digest), is listed by a kept index, or signs a kept version. Everything
+else is deleted, a stranded snapshot and its signature in the same pass.
+
+A manual run (Actions → **Prune images** → *Run workflow*) is a dry run
+unless *Only print what would be deleted* is unticked; it prints the
+verdict and the reason for every version. From a terminal:
+
+```sh
+GITHUB_TOKEN=$(gh auth token) node scripts/ghcr-prune.mjs stackradar-server stackradar-client
+GITHUB_TOKEN=$(gh auth token) node scripts/ghcr-prune.mjs --keep-days 0 stackradar-server   # reachability alone
+```
 
 ## Settings the workflows rely on
 
@@ -331,4 +360,8 @@ cluster must not re-resolve anything.
   and the release is written with `GITHUB_TOKEN`, and signing is keyless.
   Production promotion lives in the deployment repository, not here.
 - The GHCR packages `stackradar-server` and `stackradar-client` are
-  public; a first push would have created them private.
+  public; a first push would have created them private. They list this
+  repository with the admin role (Package settings → *Manage Actions
+  access*), which a first push from a workflow sets up and which is what
+  lets `prune-images.yaml` delete versions with `GITHUB_TOKEN` and
+  `packages: write`. A 403 from the prune is that role missing.

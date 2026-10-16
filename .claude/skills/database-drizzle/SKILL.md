@@ -32,41 +32,23 @@ export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 ## Schema Layout (`server/src/db/schema/`)
 
-One file per domain, all re-exported from `index.ts`:
+One file per domain, all re-exported from `index.ts`. The file list is the
+source of truth (`ls server/src/db/schema/`); do not keep a copy of it here.
+The maintained reference is [`server/src/db/schema/README.md`](../../../server/src/db/schema/README.md)
+(the core ingest path, by domain) and [`server/src/db/SCHEMA.md`](../../../server/src/db/SCHEMA.md)
+(every table). Three facts worth knowing before reading them:
 
-| File | Tables |
-|------|--------|
-| `users.ts` | `users` (profile mirror only — Auth.js session tables live in the *client* DB) |
-| `organizations.ts` | `organizations` |
-| `org-members.ts` | `orgMembers` |
-| `org-invites.ts` | `orgInvites` |
-| `api-keys.ts` | `apiKeys` (scanner credentials; optionally cluster-scoped via `clusterId`) |
-| `clusters.ts` | `clusters` |
-| `namespaces.ts` | `namespaces` |
-| `workloads.ts` | `workloads` |
-| `workload-containers.ts` | `workloadContainers` |
-| `helm-releases.ts` | `helmReleases` |
-| `gitops-applications.ts` | `gitopsApplications` |
-| `images.ts` | `images` (cluster-scoped: identity is `(cluster_id, digest)`, ADR 0006) |
-| `sboms.ts` | `sboms` (one per image via `sboms_image_id_unique` — no `is_current` flag) |
-| `components.ts` | `components` |
-| `component-dependencies.ts` | `componentDependencies` |
-| `component-hashes.ts` | `componentHashes` |
-| `component-external-refs.ts` | `componentExternalRefs` |
-| `component-properties.ts` | `componentProperties` |
-| `licenses.ts` | `licenses`, `componentLicenses` |
-| `vulnerabilities.ts` | `vulnerabilities`, `vulnerabilityAffectedPackages`, `componentVulnerabilities`, `vulnerabilitySyncStatus` |
-| `jobs.ts` | `jobs` |
-| `vulnerability-scan-runs.ts` | `vulnerabilityScanRuns` |
-| `osv-mirror.ts` | `osvSyncState`, `osvSyncRuns`, `osvSyncFailures` (bookkeeping only — the OSV mirror writes advisories into `vulnerabilities` / `vulnerabilityAffectedPackages`; there are no `osvVulns` / `osvAffectedPackages` tables) |
-| `threat-intel.ts` | `epssSyncState`, `kevSyncState` |
-| `remediation.ts` | `issues`, `findingStates`, `activityEvents` |
-| `chart-repositories.ts` | `chartRepositories`, `chartRepoEntries` |
-| `artifact-hub.ts` | `artifactHubPackages`, `artifactHubSyncState` |
-| `chart-attributions.ts` | `chartAttributions` |
-| `chart-observations.ts` | `chartRenders`, `chartImageObservations` |
-| `org-metrics-snapshots.ts` | `orgMetricsSnapshots` |
-| `cluster-metrics-snapshots.ts` | `clusterMetricsSnapshots` |
+- `users.ts` is a profile mirror only. The Auth.js tables (`users`, `sessions`,
+  `accounts`, `verification_tokens`) belong to the *client's* Drizzle project
+  (`client/src/db/schema/`) and live in the `auth` schema of the **same**
+  database, with their own journal (`auth.__drizzle_migrations`).
+- `images` is cluster-scoped: identity is `(cluster_id, digest)` (ADR 0006), and
+  `sboms` holds one row per image via `sboms_image_id_unique`; there is no
+  `is_current` flag.
+- The OSV mirror writes advisories into `vulnerabilities` /
+  `vulnerability_affected_packages`; `osv-mirror.ts` is bookkeeping only
+  (`osv_sync_state`, `osv_sync_runs`, `osv_sync_failures`). There are no
+  `osv_vulns` / `osv_affected_packages` tables.
 
 ## Table Definition Pattern
 
@@ -143,7 +125,14 @@ return db.transaction(async (tx) => {
 - Journal: `drizzle/meta/_journal.json`
 - Files: `{index}_{descriptive-name}.sql` (e.g. `0002_add-cvss-score-to-vulnerabilities.sql`)
 - Generate: `pnpm db:generate`
-- Apply: **never locally** — migrations run only as an ArgoCD pre-sync job on deploy (do not run `pnpm db:migrate`, `db:reset`, or drizzle-kit migrate/push)
+- Apply: only against a database you own. Your local Compose database:
+  `MIGRATE_ON_START=true pnpm dev`. Self-hosted installs apply the chain at
+  boot the same way (`src/db/migrate.ts`, under an advisory lock shared with
+  the client's migrator); hosted deployments apply it from their deploy
+  pipeline. Never run `pnpm db:migrate`, `db:reset` or drizzle-kit
+  migrate/push against a shared or hosted database — ship the generated file
+  with the release and let that environment's normal path apply it (root
+  `AGENTS.md`, "Database Setup").
 - Studio: `pnpm db:studio`
 
 ## Common Drizzle Imports
@@ -156,5 +145,5 @@ import { db, schema, type Transaction } from "../db/index.js";
 ## Docker Compose Database
 
 - Port: `5444` (mapped to container `5432`)
-- Two databases: `client` (NextAuth) and `server` (app data)
+- One database, `server`: the server owns the `public` schema, the client's Auth.js tables live in its `auth` schema
 - Init script: `scripts/init-db.sql`

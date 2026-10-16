@@ -17,8 +17,8 @@ class in `client/src` — no `text-red-400`, `bg-gray-50`, `dark:bg-white/5`,
 themes, which is the entire point.
 
 If the token you want doesn't exist, **add it to `theme.css`** rather than
-reaching for `dark:`. After the 2026-07-25 migration `dark:` survives in exactly
-one file — `ProjectOriginStrip.tsx` (see Exceptions) — treat a second as a smell. A per-theme override is a design decision
+reaching for `dark:`. Since the 2026-07-25 migration no file in `client/src` uses `dark:`
+at all — treat any occurrence as a smell. A per-theme override is a design decision
 with no name; give it one. `nav-active-fg` and `surface-overlay` both started as
 `dark:` escape hatches.
 
@@ -519,8 +519,8 @@ These are the only expected hits from either grep below. Anything else is a find
 
 | Location | Raw palette | `dark:` | Why |
 |----------|---|---|-----|
-| `components/clusters/ConnectClusterInstructions.tsx` | ✅ | — | Deliberately always-dark code panel (`variant="dark"`) |
-| `components/project-detail/ProjectOriginStrip.tsx` | ✅ | ✅ | ArgoCD brand orange on the `SiArgo` logo |
+| `components/ui/CodeBlock.tsx` | ✅ | — | Deliberately always-dark code block (`bg-gray-950`, `text-gray-100`, white overlays) |
+| `components/clusters/ConnectClusterInstructions.tsx` | ✅ | — | Its `isDark` branch (`variant="dark"`), the always-dark connect panel |
 
 ## Verifying a change
 
@@ -538,7 +538,7 @@ grep -rhoP '\b(?:bg|text|border|ring|outline|divide|placeholder|fill|stroke)-(?:
 comm -23 /tmp/used.txt /tmp/defined.txt    # must be empty
 ```
 
-Find raw palette classes that crept back in (should return only the three exceptions):
+Find raw palette classes that crept back in (should return only the exceptions above):
 
 ```bash
 grep -rnP '\b(bg|text|border|ring|divide|fill|stroke|placeholder)-((gray|slate|zinc|neutral|red|amber|yellow|orange|emerald|green|blue|cyan|indigo|violet|purple|pink|rose|teal|sky)-[0-9]+|white|black)(\/[0-9]+)?\b' \
@@ -554,9 +554,9 @@ equivalents:
 
 ```bash
 # A colour-bearing prop taking a literal instead of a token.
-# Expected hits: the Google logo's four brand paths in `app/login/page.tsx` and
-# `app/invite/[token]/page.tsx` (#4285F4 / #34A853 / #FBBC05 / #EA4335) — a brand
-# mark is not themeable. Anything else is a finding.
+# Expected hits: the Google logo's four brand paths in `app/login/page.tsx`
+# (#4285F4 / #34A853 / #FBBC05 / #EA4335) — a brand mark is not themeable.
+# Anything else is a finding.
 grep -rnE '(stroke|fill|stopColor|backgroundColor|color)\s*[:=]\s*.?#[0-9a-fA-F]{3,8}' \
   --include='*.tsx' src
 

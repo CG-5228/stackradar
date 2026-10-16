@@ -109,29 +109,31 @@ describe("GET /api/projects", () => {
 ## Unit Test Pattern
 
 ```typescript
-describe("OsvVulnRepository", () => {
-  let db: ReturnType<typeof getTestDb>;
-  let repository: OsvVulnRepository;
+describe("OsvAffectedPackageRepository", () => {
+  let repo: OsvAffectedPackageRepository;
 
   beforeAll(() => {
-    db = getTestDb();
-    repository = createOsvVulnRepository(db);
+    repo = createOsvAffectedPackageRepository(getTestDb());
   });
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE TABLE osv_vulns CASCADE`);
+    const db = getTestDb();
+    // FK order, same reason cleanAllData() does it: comp_vuln_vuln_fk is RESTRICT.
+    await db.execute(sql`TRUNCATE TABLE vulnerability_affected_packages`);
+    await db.execute(sql`DELETE FROM component_vulnerabilities`);
+    await db.execute(sql`DELETE FROM vulnerabilities WHERE source = 'osv'`);
+    await db.execute(sql`DELETE FROM osv_sync_state`); // reads are scoped to the live generation
   });
 
   it("should insert a new record", async () => {
-    const record = createTestRecord("TEST-001", new Date());
-    await repository.upsert([record]);
+    await repo.upsert([createTestRecord("TEST-001")]);
     // ...
   });
 });
 ```
 
 ### Conventions
-- Inject DB into modules using factory functions (e.g. `createOsvVulnRepository(db)`)
+- Inject DB into modules using factory functions (e.g. `createOsvAffectedPackageRepository(db)`)
 - Clean with `TRUNCATE ... CASCADE` or `cleanTables()`
 - No HTTP layer — test repository/business logic directly
 
@@ -152,7 +154,7 @@ describe("OsvVulnRepository", () => {
 ## Naming Conventions
 
 - Files: `*.test.ts`
-- `describe`: feature or route (e.g. `"GET /api/projects"`, `"OsvVulnRepository"`)
+- `describe`: feature or route (e.g. `"GET /api/clusters"`, `"OsvAffectedPackageRepository"`)
 - `it`: behavior starting with `"should ..."` (e.g. `"should list all projects"`)
 
 ## Running Tests

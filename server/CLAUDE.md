@@ -93,7 +93,7 @@ export type NewThing = typeof things.$inferInsert;
 ## Database Migrations
 
 > [!IMPORTANT]
-> Against the dev and prod databases, migrations are applied **only** by the deploy (ArgoCD PreSync Jobs). Do **not** run `pnpm db:migrate` or `pnpm db:reset` there, and never set `MIGRATE_ON_START` on a cloud Deployment. Authoring migration files with `pnpm db:generate` is fine. Self-hosted installs (and your own local Compose database) apply the chain at boot with `MIGRATE_ON_START=true` via `src/db/migrate.ts`, under an advisory lock shared with the client's migrator — see the root `CLAUDE.md`, "Database Setup".
+> Do **not** apply migrations against a database you do not own. Hosted deployments apply them from their deploy pipeline, so never run `pnpm db:migrate` or `pnpm db:reset` against a shared or hosted database, and never set `MIGRATE_ON_START` on a hosted Deployment. Authoring migration files with `pnpm db:generate` is fine. Self-hosted installs (and your own local Compose database) apply the chain at boot with `MIGRATE_ON_START=true` via `src/db/migrate.ts`, under an advisory lock shared with the client's migrator — see the root `CLAUDE.md`, "Database Setup".
 
 ## Auth Middleware
 

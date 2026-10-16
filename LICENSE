@@ -1,18 +1,3 @@
-StackRadar
-Copyright (C) 2026 LockDep
-
-This program is licensed under the GNU Affero General Public License,
-version 3 only (AGPL-3.0-only), reproduced in full below.
-
-Exception: files under `server/src/cloud/` and `client/src/cloud/` are licensed
-under the StackRadar Cloud Licence in their respective `LICENSE` files, not
-under the AGPL.
-
-The licence covers the code, not the name: "StackRadar", "LockDep" and the
-StackRadar logo are trademarks and are not licensed under the AGPL. See NOTICE.
-
------------------------------------------------------------------------
-
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
 

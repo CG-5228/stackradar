@@ -5,8 +5,8 @@ Copyright (c) 2026 LockDep. All rights reserved.
 
 Everything in this directory (`server/src/cloud/`) is **source-available**
 under this licence and is **not** covered by the GNU Affero General Public
-License that applies to the rest of this repository (see the `LICENSE` file at
-the repository root, whose exception clause names this directory). Each file
+License that applies to the rest of this repository (see the `LICENSE` and
+`NOTICE` files at the repository root; NOTICE names this directory). Each file
 carries the header `SPDX-License-Identifier: LicenseRef-StackRadar-Cloud`.
 
 This licence is modelled on the PolyForm Shield License 1.0.0

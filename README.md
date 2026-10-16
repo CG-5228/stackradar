@@ -11,7 +11,7 @@ AGPL-3.0, or hosted at [app.stackradar.io](https://app.stackradar.io).
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/lockdep/stackradar/codeql.yaml?branch=main&style=flat-square&label=CodeQL)](https://github.com/lockdep/stackradar/actions/workflows/codeql.yaml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-informational?style=flat-square)](LICENSE)
 [![Signed with cosign](https://img.shields.io/badge/Signed-cosign%20keyless-informational?style=flat-square)](#verifying-what-you-install)
-[![Helm chart](https://img.shields.io/badge/Helm-lockdep%2Fhelm--charts-informational?style=flat-square)](https://github.com/lockdep/helm-charts)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/lockdep&style=flat-square)](https://artifacthub.io/packages/helm/lockdep/stackradar)
 [![Discussions](https://img.shields.io/badge/Discussions-ask%20a%20question-informational?style=flat-square)](https://github.com/lockdep/stackradar/discussions)
 
 A read-only scanner agent in the cluster generates a CycloneDX SBOM for

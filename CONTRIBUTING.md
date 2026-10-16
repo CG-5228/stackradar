@@ -119,7 +119,10 @@ cloud directory is a conversation to have in the issue first.
   the oldest populated install, so a migration that only works on an empty
   database is a defect.
 * Avoid new dependencies for things that are trivial to write or are in
-  the standard library.
+  the standard library. A new runtime dependency has to carry a licence an
+  AGPL-3.0 image may ship; the `dependency-licenses` gate checks the
+  lockfile against the allow-list in
+  [`scripts/check-dependency-licenses.mjs`](scripts/check-dependency-licenses.mjs).
 * Do not mix unrelated whitespace or formatting changes into a change
   (Prettier makes a correctly formatted change produce none).
 * The pull request title becomes a line in the release notes, under the

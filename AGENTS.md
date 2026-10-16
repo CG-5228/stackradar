@@ -85,8 +85,9 @@ keep in mind from it: there is no root `package.json`, so every `pnpm`
 command runs inside `server/` or `client/`; and the server tests run
 against a real PostgreSQL started by Testcontainers, so Docker has to be
 up. The `.github/workflows/` gates (`ci-test`, `cloud-boundary`,
-`cross-app-drift`, `dead-exports`, `primer-token-drift`,
-`osv-schema-drift`) are what a pull request has to pass.
+`cross-app-drift`, `dead-exports`, `dependency-licenses`,
+`primer-token-drift`, `osv-schema-drift`) are what a pull request has to
+pass.
 
 ## Architecture
 

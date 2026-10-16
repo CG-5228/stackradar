@@ -260,6 +260,7 @@ database.
 | `cloud-boundary` | `node scripts/check-cloud-boundary.mjs`: every file under `server/src/cloud/` and `client/src/cloud/` carries the SPDX header, nothing outside does, and the AGPL core imports the cloud only at its designated mount points |
 | `cross-app-drift` | `node scripts/check-cross-app-constants.mjs`: the few constants the client copies from the server (risk bands, plan limits, the migration lock key) still match |
 | `dead-exports` | `pnpm knip` in each app |
+| `dependency-licenses` | `node scripts/check-dependency-licenses.mjs`: every runtime dependency of each app carries a licence an AGPL-3.0 image may ship (runs when a manifest or lockfile changes; needs `pnpm install` first) |
 | `primer-token-drift` | `pnpm tokens:check`: `client/src/app/theme.css` is still what `@primer/primitives` generates |
 | `osv-schema-drift` | `node server/scripts/sync-osv-schema.mjs --verify`: the vendored OSV schema was not hand-edited (and weekly, that upstream has not moved) |
 | `snapshot` | Both images build (push disabled on a pull request) |

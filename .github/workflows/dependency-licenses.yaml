@@ -1,0 +1,55 @@
+name: Dependency Licences
+
+# The two apps are AGPL-3.0-only and their images ship every runtime
+# dependency, so a dependency under an incompatible or missing licence is a
+# defect in the release, not a footnote. scripts/check-dependency-licenses.mjs
+# reads the licence pnpm reports for each runtime package and fails on any
+# expression outside its allow-list (or any package without one). It runs
+# when a lockfile or manifest changes, which is the only time the answer
+# can change.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/package.json"
+      - "server/pnpm-lock.yaml"
+      - "client/package.json"
+      - "client/pnpm-lock.yaml"
+      - "scripts/check-dependency-licenses.mjs"
+      - ".github/workflows/dependency-licenses.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: "licences (${{ matrix.app }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [server, client]
+    steps:
+      - uses: actions/checkout@v6
+
+      # No `version`: pnpm/action-setup reads the app's `packageManager`
+      # field, so the lockfile and the CI pnpm never disagree.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ${{ matrix.app }}/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.app }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Check runtime dependency licences
+        run: node scripts/check-dependency-licenses.mjs ${{ matrix.app }}

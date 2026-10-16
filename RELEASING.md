@@ -147,18 +147,18 @@ template's dropdown.
    release branch refuses a version from another minor;
 3. stamps the version into both `package.json` files and the defect
    template with [`scripts/release-set-version.mjs`](scripts/release-set-version.mjs),
-   commits (`prepare-release: set version to 0.2.0`, DCO-signed as
-   `github-actions[bot]`) and pushes the branch, then tags `v0.2.0` and
-   pushes the tag. The branch is pushed first: if someone landed a commit
-   meanwhile the push is rejected, nothing has been tagged, and re-running
-   is free;
+   commits (`prepare-release: set version to 0.2.0 [skip ci]`, DCO-signed
+   as `github-actions[bot]`) and pushes the branch over SSH as the release
+   deploy key, then tags `v0.2.0` and pushes the tag. The branch is pushed
+   first: if someone landed a commit meanwhile the push is rejected, nothing
+   has been tagged, and re-running is free;
 4. drafts the GitHub Release with notes generated from the pull requests'
    labels;
-5. starts `publish.yaml` on the tag (a tag pushed with `GITHUB_TOKEN`
-   raises no push event, so it has to be started explicitly);
+5. starts `publish.yaml` on the tag (the tagged commit carries
+   `[skip ci]`, so the tag push starts nothing by itself);
 6. bumps the branch to the next snapshot (`prepare-iteration: set version
-   to 0.3.0-snapshot`; the next patch on a release branch). That push runs
-   no CI either, which is fine: the next real commit does.
+   to 0.3.0-snapshot [skip ci]`; the next patch on a release branch). That
+   push runs no CI either, which is fine: the next real commit does.
 
 [`publish.yaml`](.github/workflows/publish.yaml), on the tag:
 
@@ -350,10 +350,26 @@ GITHUB_TOKEN=$(gh auth token) node scripts/ghcr-prune.mjs --keep-days 0 stackrad
   `packages: write` to push images, `id-token: write` to sign,
   `security-events: write` to upload scans, `actions: write` to start
   `publish.yaml`).
-- `main` and the `x.y.x` branches must accept pushes from
-  `github-actions[bot]`: either unprotected, or with GitHub Actions on the
-  bypass list. A ruleset that requires pull requests for every push stops
-  `release.yaml` at its first commit, with nothing tagged.
+- `RELEASE_DEPLOY_KEY`: the private half of a **write deploy key** on this
+  repository, as a repository secret. `release.yaml` checks out with it and
+  pushes the version commits and the tag over SSH as that key. The ruleset
+  on `main` requires pull requests and lists *deploy keys* on its bypass,
+  which is what lets those pushes through; GitHub does not allow
+  `GITHUB_TOKEN` on a bypass list, so without the key `release.yaml` stops
+  at its first commit with nothing tagged. The `x.y.x` branches are not
+  covered by the ruleset. To create or rotate it:
+
+  ```sh
+  ssh-keygen -t ed25519 -N "" -C "lockdep/stackradar release workflow" -f release_deploy_key
+  gh repo deploy-key add release_deploy_key.pub --allow-write --title "Release workflow"
+  gh secret set RELEASE_DEPLOY_KEY < release_deploy_key
+  rm release_deploy_key release_deploy_key.pub
+  ```
+
+  Deploy keys have to be allowed in the organisation's member privileges
+  for the first command to succeed. Pushes made with a deploy key raise
+  push events (a `GITHUB_TOKEN` push does not), which is why the two
+  version commits carry `[skip ci]`.
 - `snapshot.yaml` uses `GITOPS_DEVELOPMENT_TOKEN` only to notify the
   maintainers' development deployment of a new snapshot; without it the job
   logs that and exits 0. Nothing else needs a secret: the images are pushed

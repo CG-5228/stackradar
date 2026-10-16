@@ -12,10 +12,16 @@ name: Release
 #   x.y.x   -> a bugfix of an older minor; the branch is bumped to the next
 #              patch snapshot. The version must belong to that branch.
 #
-# Everything is pushed with GITHUB_TOKEN under the github-actions[bot]
-# identity (DCO-signed like every other commit). A push made with that token
-# raises no push event, which is why publish.yaml is started explicitly and
-# why the snapshot bump runs no CI (the next real commit does).
+# The version commits and the tag are pushed over SSH with the write deploy
+# key in RELEASE_DEPLOY_KEY (RELEASING.md, "Settings the workflows rely
+# on"), committed as github-actions[bot] and DCO-signed like every other
+# commit. The ruleset on main requires pull requests and lists deploy keys
+# on its bypass, so this is the one identity that may push there directly;
+# GITHUB_TOKEN cannot be put on a bypass list. Unlike a GITHUB_TOKEN push, a
+# deploy-key push does raise push events, so both version commits carry
+# `[skip ci]`: nothing runs on them (the next real commit does), the tag
+# push starts nothing on its own (its commit carries the marker), and
+# publish.yaml is started explicitly, once, on the tag.
 
 on:
   workflow_dispatch:
@@ -155,6 +161,9 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.branch }}
           fetch-depth: 0 # --generate-notes needs the previous tag
+          # Pushes below go over SSH as the deploy key, which the ruleset on
+          # main lets through where GITHUB_TOKEN would be refused.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Configure git identity
         run: |
@@ -173,7 +182,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "Everything already carries ${VERSION}; nothing to commit."
           else
-            git commit -s -m "prepare-release: set version to ${VERSION}"
+            git commit -s -m "prepare-release: set version to ${VERSION} [skip ci]"
           fi
           git push origin "HEAD:${BRANCH}"
 
@@ -193,8 +202,8 @@ jobs:
           [[ "${PRERELEASE}" == "true" ]] && args+=(--prerelease)
           gh release create "v${VERSION}" "${args[@]}"
 
-      # A tag pushed with GITHUB_TOKEN raises no push event, so publish.yaml
-      # has to be started by hand, on the tag it should publish.
+      # The tagged commit carries [skip ci], so the tag push itself starts
+      # nothing; publish.yaml is started here, on the tag it should publish.
       - name: Start the publish workflow
         run: gh workflow run publish.yaml --ref "v${VERSION}"
 
@@ -206,7 +215,7 @@ jobs:
           set -euo pipefail
           node scripts/release-set-version.mjs "${NEXT}"
           git add server/package.json client/package.json
-          git commit -s -m "prepare-iteration: set version to ${NEXT}"
+          git commit -s -m "prepare-iteration: set version to ${NEXT} [skip ci]"
           git push origin "HEAD:${BRANCH}"
 
       - name: Summarise

@@ -8,8 +8,8 @@ name: Publish
 # ci-publish.yaml and _meta-build.yaml; the immutability guard and the
 # attestation checks are the scanner's (lockdep/stackradar-scanner).
 #
-# Runs on a tag and only on a tag. release.yaml pushes the tag with
-# GITHUB_TOKEN, which raises no push event, and starts this workflow
+# Runs on a tag and only on a tag. release.yaml tags a commit marked
+# `[skip ci]`, so its tag push starts nothing, and it starts this workflow
 # explicitly on the tag ref; a tag pushed from a laptop arrives through the
 # push trigger. Dispatch it the same way, on the tag, to retry a run that
 # failed before it pushed anything.
